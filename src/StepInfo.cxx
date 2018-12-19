@@ -25,6 +25,7 @@
 #include <TGeoVolume.h>
 #include <cassert>
 #include <iostream>
+#include <fstream>
 
 ClassImp(o2::StepInfo);
 ClassImp(o2::MagCallInfo);
@@ -70,6 +71,11 @@ StepInfo::StepInfo(TVirtualMC* mc)
     }
   }
 
+  // sensitive volume info
+  if (lookupstructures.volidtoissensitive.size() > 0) {
+    insensitiveRegion = lookupstructures.volidtoissensitive[volId];
+  }
+
   double xd, yd, zd;
   mc->TrackPosition(xd, yd, zd);
   x = xd;
@@ -113,4 +119,53 @@ MagCallInfo::MagCallInfo(TVirtualMC* mc, float ax, float ay, float az, float aBx
 }
 
 int MagCallInfo::stepcounter = -1;
+
+// try to init a map of volID to sensitive/ornot
+// by using a list of sensitive volume names (given in a file)
+// the current ROOT geometry loaded
+bool StepLookups::initSensitiveVolLookup(const std::string& filename)
+{
+  if (!gGeoManager) {
+    std::cerr << "[MCSTEPLOG] : Cannot setup sensitive lookup since GeoManager not found \n";
+    return false;
+  }
+  // get list of all TGeoVolumes
+  auto vlist = gGeoManager->GetListOfVolumes();
+  volidtoissensitive.resize(vlist->GetEntries(), false);
+
+  auto setSensitive = [this](int volID, bool sensitive) {
+    if (volID >= volidtoissensitive.size()) {
+      // should not happen
+      assert(false);
+    }
+    volidtoissensitive[volID] = sensitive;
+  };
+
+  // lambda returning all ids with that name
+  // assume the name to be unique
+  auto findSensVolumeAndRegister = [&vlist, setSensitive](const std::string& name) {
+    for (int i = 0; i < vlist->GetEntries(); ++i) {
+      auto v = static_cast<TGeoVolume*>(vlist->At(i));
+      if (strcmp(v->GetName(), name.c_str()) == 0) {
+        setSensitive(v->GetNumber(), true);
+        std::cout << "Registering " << v->GetNumber() << " as id for sensitive volume " << name << "\n";
+      }
+    }
+  };
+
+  // open for reading or fail
+  std::ifstream ifs;
+  ifs.open(filename);
+  if (ifs.is_open()) {
+    std::string line;
+    std::vector<int> ids;
+    while (std::getline(ifs, line)) {
+      // a line is supposed to be a volume name
+      findSensVolumeAndRegister(line);
+    }
+    return true;
+  }
+  return false;
 }
+
+} // namespace o2
