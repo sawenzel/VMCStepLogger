@@ -13,6 +13,8 @@
 
 #include "MCStepLogger/BasicMCAnalysis.h"
 #include "MCStepLogger/MCAnalysisUtilities.h"
+#include "TInterpreter.h"
+#include "TInterpreterValue.h"
 
 ClassImp(o2::mcstepanalysis::BasicMCAnalysis);
 
@@ -25,6 +27,7 @@ BasicMCAnalysis::BasicMCAnalysis()
 
 void BasicMCAnalysis::initialize()
 {
+  std::cout  << "START INIT\n";
   // number of events
   histNEvents = getHistogram<TH1D>("nEvents", 1, 0., 1.);
   // number of tracks over all events
@@ -44,7 +47,13 @@ void BasicMCAnalysis::initialize()
   // relative number of steps per volume averaged over number of events
   histRelNStepsPerVolPerEvent = getHistogram<TH1D>("relNStepsPerVolPerEvent", 1, 0., 1.);
   // number of steps done per module (unormalized)
-  histNStepsPerMod = getHistogram<TH1D>("nStepPerMod", 1, 0., 1.);
+  histNStepsPerMod = getHistogram<TH1D>("nStepsPerMod", 1, 0., 1.);
+  // number of steps done per volume (unormalized)
+  histNStepsPerVol = getHistogram<TH1D>("nStepsPerVol", 1, 0., 1.);
+  // number of secondaries produced per volume (unormalized)
+  histNSecondariesPerVol = getHistogram<TH1D>("nSecondariesPerVol", 1, 0., 1.);
+  // number of secondaries produced per module (unormalized)
+  histNSecondariesPerMod = getHistogram<TH1D>("nSecondariesPerMod", 1, 0., 1.);
   // number of steps made by particles of certain PDG ID averaged over number of events
   histNStepsPerPDGPerEvent = getHistogram<TH1D>("nStepsPerPDGPerEvent", 1, 0., 1.);
   // relative number of steps made by particles of certain PDG ID averaged over number of events
@@ -83,6 +92,25 @@ void BasicMCAnalysis::initialize()
   volPresent.clear();
   // helper to check in how many events a certain volume was traversed
   pdgPresent.clear();
+
+
+  // init runtime user cut
+  // thanks to discussions with Philippe Canal, Fermilab
+  auto cutcondition = getenv("MCSTEPCUT");
+  if (cutcondition) {
+    std::string expr = "#include \"StepInfo.h\"\n bool user_cut(const o2::StepInfo &step, \
+                        const std::string &volname,                                       \
+                        const std::string &modname,                                       \
+                        int pdg) {";
+    expr+=std::string(cutcondition);
+    expr+=std::string("}");
+    gInterpreter->AddIncludePath("/Users/swenzel/alisw_new/MCStepLogger/include/MCStepLogger/");
+    gInterpreter->Declare(expr.c_str());
+    TInterpreterValue *v = gInterpreter->CreateTemporary();
+    // std::unique_ptr<TInterpreterValue> v = gInterpreter->MakeInterpreterValue();
+    gInterpreter->Evaluate("user_cut", *v);
+    mUserCutFunction = (cut_function_type*)v->GetValAddr();
+  }
 }
 
 void BasicMCAnalysis::analyze(const std::vector<StepInfo>* const steps, const std::vector<MagCallInfo>* const magCalls)
@@ -132,11 +160,20 @@ void BasicMCAnalysis::analyze(const std::vector<StepInfo>* const steps, const st
     mAnalysisManager->getLookupVolName(step.volId, volName);
     mAnalysisManager->getLookupModName(step.volId, modName);
 
+    // apply user defined cut -- if any
+    if (mUserCutFunction && !(*mUserCutFunction)(step, volName, modName, pdgId)) {
+      continue;
+    }
+    
     // first increment the total number of steps over all events
     nSteps++;
 
     // record number of steps per module
     histNStepsPerMod->Fill(modName.c_str(), 1.);
+    // record number of steps per volume
+    histNStepsPerVol->Fill(volName.c_str(), 1.);
+    histNSecondariesPerVol->Fill(volName.c_str(), step.nsecondaries);
+    histNSecondariesPerMod->Fill(modName.c_str(), step.nsecondaries);
 
     // avoid double counting of tracks in an event, so check if track ID is already registered
     if (std::find(tracks.begin(), tracks.end(), step.trackID) == tracks.end() && step.trackID > -1) {
@@ -242,6 +279,10 @@ void BasicMCAnalysis::finalize()
   // fill and update (e.g. scaling) some histograms
   histNVols->Fill(0.5, volIds.size());
   histNVols->SetEntries(volIds.size());
+
+  // sort
+  histNStepsPerVol->LabelsOption(">", "X");
+  histNSecondariesPerVol->LabelsOption(">", "X");
 
   // just normalise over all events
   histNStepsPerEvent->Scale(1. / histNEvents->GetEntries());

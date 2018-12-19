@@ -23,7 +23,6 @@ class TGeoMedium;
 
 namespace o2
 {
-// class collecting info about one MC step done
 
 struct VolInfoContainer {
   VolInfoContainer() = default;
@@ -57,6 +56,7 @@ struct StepLookups {
   std::vector<std::string*> volidtovolname;
   std::vector<std::string*> volidtomodule;
   std::vector<std::string*> volidtomedium;
+  std::vector<bool>         volidtoissensitive; // keep track of which volume is sensitive
   std::vector<int> tracktopdg;
   std::vector<int> tracktoparent; // when parent is -1 we mean primary
   std::vector<int> stepcounterpertrack;
@@ -106,6 +106,9 @@ struct StepLookups {
     crossedboundary[trackindex]=b;
   }
   
+
+  bool initSensitiveVolLookup(std::string const& filename);
+
   void insertParent(int trackindex, int parent)
   {
     constexpr int PRIMARY = -1;
@@ -141,6 +144,7 @@ struct StepLookups {
   ClassDefNV(StepLookups, 1);
 };
 
+// struct collecting info about one MC step done
 struct StepInfo {
   StepInfo() = default;
   // construct directly using virtual mc
@@ -161,6 +165,7 @@ struct StepInfo {
   int* secondaryprocesses = nullptr; //[nsecondaries]
   int nprocessesactive = 0;          // number of active processes
   bool stopped = false;              //
+  bool insensitiveRegion = false;    // whether step done in sensitive region
 
   static int stepcounter;           //!
   static StepInfo* currentinstance; //!

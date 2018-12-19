@@ -58,6 +58,15 @@ const char* getVolMapFile()
   }
 }
 
+const char* getSensitiveVolFile()
+{
+  if (const char* f = std::getenv("MCSTEPLOG_SENSVOLFILE")) {
+    return f;
+  } else {
+    return "MCStepLoggerSenVol.dat";
+  }
+}
+
 // initializes a mapping from volumename to detector
 // used for step resolution to detectors
 void initVolumeMap()
@@ -216,6 +225,9 @@ class StepLogger
     }
     // try to load the volumename -> modulename mapping
     initVolumeMap();
+
+    // init the sensitive volume stuff
+    StepInfo::lookupstructures.initSensitiveVolLookup(getSensitiveVolFile());
   }
 
   void addStep(TVirtualMC* mc)

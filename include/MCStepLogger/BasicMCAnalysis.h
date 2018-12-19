@@ -57,6 +57,11 @@ namespace o2
 namespace mcstepanalysis
 {
 
+// type defining the cut-function signature
+// probably needs to be generalized
+// here we will give Step + meta info such as volumename, modulename, pdg
+typedef bool (*cut_function_type)(StepInfo const&, std::string const&, std::string const&, int);
+  
 class BasicMCAnalysis : public MCAnalysis
 {
  public:
@@ -89,6 +94,13 @@ class BasicMCAnalysis : public MCAnalysis
   TH1D* histNStepsPerVolPerEvent;
   // accumulated number of steps per module/region
   TH1D* histNStepsPerMod;
+  // accumulated number of steps per volume
+  TH1D* histNStepsPerVol;
+  // accumulated number of secondaries per volume
+  TH1D* histNSecondariesPerVol;
+  // accumulated number of secondaries per module
+  TH1D* histNSecondariesPerMod;
+
   // relative number of steps per volume averaged over number of events
   TH1D* histRelNStepsPerVolPerEvent;
   // number of steps made by particles of certain PDG ID averaged over number of events
@@ -129,6 +141,9 @@ class BasicMCAnalysis : public MCAnalysis
   std::unordered_map<std::string, float> pdgPresent;
   // helper to check in how many events a certain volume was traversed
   std::unordered_map<std::string, float> volPresent;
+
+  // pointing to a user cut function 
+  cut_function_type* mUserCutFunction = nullptr; //!
 
   ClassDefNV(MCAnalysis, 1);
 };
