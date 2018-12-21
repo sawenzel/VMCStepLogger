@@ -143,12 +143,15 @@ bool StepLookups::initSensitiveVolLookup(const std::string& filename)
 
   // lambda returning all ids with that name
   // assume the name to be unique
+  // unfortunately this is very slow: we should think about a more clever way
   auto findSensVolumeAndRegister = [&vlist, setSensitive](const std::string& name) {
     for (int i = 0; i < vlist->GetEntries(); ++i) {
       auto v = static_cast<TGeoVolume*>(vlist->At(i));
-      if (strcmp(v->GetName(), name.c_str()) == 0) {
-        setSensitive(v->GetNumber(), true);
-        std::cout << "Registering " << v->GetNumber() << " as id for sensitive volume " << name << "\n";
+      if (strlen(v->GetName()) == strlen(name.c_str())) {
+        if (strcmp(v->GetName(), name.c_str()) == 0) {
+          setSensitive(v->GetNumber(), true);
+          std::cout << "Registering " << v->GetNumber() << " as id for sensitive volume " << name << "\n";
+        }
       }
     }
   };
