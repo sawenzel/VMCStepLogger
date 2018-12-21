@@ -32,6 +32,7 @@ set(SRCS
     ${IMP_SRC_DIR}/StepInfo.cxx
     ${IMP_SRC_DIR}/MCAnalysis.cxx
     ${IMP_SRC_DIR}/BasicMCAnalysis.cxx
+    ${IMP_SRC_DIR}/SimpleStepAnalysis.cxx
     ${IMP_SRC_DIR}/MCAnalysisManager.cxx
     ${IMP_SRC_DIR}/MCAnalysisFileWrapper.cxx
     ${IMP_SRC_DIR}/MCAnalysisUtilities.cxx
@@ -44,6 +45,7 @@ set(HEADERS
    ${INC_SRC_DIR}/MetaInfo.h
    ${INC_SRC_DIR}/MCAnalysis.h
    ${INC_SRC_DIR}/BasicMCAnalysis.h
+   ${INC_SRC_DIR}/SimpleStepAnalysis.h
    ${INC_SRC_DIR}/MCAnalysisManager.h
    ${INC_SRC_DIR}/MCAnalysisFileWrapper.h
    ${INC_SRC_DIR}/MCAnalysisUtilities.h
