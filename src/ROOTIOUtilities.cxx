@@ -9,7 +9,7 @@
 // or submit itself to any jurisdiction.
 
 #include "MCStepLogger/ROOTIOUtilities.h"
-
+#include <iostream>
 ClassImp(o2::mcstepanalysis::ROOTIOUtilities);
 
 using namespace o2::mcstepanalysis;
@@ -228,11 +228,20 @@ bool ROOTIOUtilities::fetchData(int event)
   int gotten = 0;
   // specific entry required
   if (event > -1) {
-    gotten = mTTree->GetEntry(event);
+    gotten = std::abs(mTTree->GetEntry(event));
   }
   // just get the next one
   else {
-    gotten = mTTree->GetEntry(mTTreeCounter++);
+    // loop over branches and get entries separately
+    // this seems more robust than just saying mTTree->GetEntry()
+    auto brlist = mTTree->GetListOfBranches();
+    for (int i = 0; i < brlist->GetEntries(); ++i) {
+      auto br = static_cast<TBranch*>(brlist->At(i));
+      auto got = br->GetEntry(mTTreeCounter);
+      std::cout << "For branch " << br->GetName() << " GOT " << got << " BYTES \n";
+      gotten += std::abs(got);
+    }
+    mTTreeCounter++;
   }
   return (gotten > 0);
 }
