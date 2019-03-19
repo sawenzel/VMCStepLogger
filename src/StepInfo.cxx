@@ -47,6 +47,7 @@ StepInfo::StepInfo(TVirtualMC* mc)
 
   trackID = stack->GetCurrentTrackNumber();
   lookupstructures.insertPDG(trackID, mc->TrackPid());
+  lookupstructures.incStepCount(trackID);
 
   auto id = mc->CurrentVolID(copyNo);
   volId = id;
@@ -67,6 +68,28 @@ StepInfo::StepInfo(TVirtualMC* mc)
       if (iter != volnametomodulemap->end()) {
         lookupstructures.insertModuleName(volId, iter->second);
       }
+      else {
+	// std::cout << "VOL NOT FOUND .. GO UP UNTIL WE FIND A KNOWN VOLUME NAME " << volname << "\n";
+	// trying to look upward
+        int up = 1;
+	int upcopy;
+        int upVolID;
+	const char* upVolName;
+        int limit = 20;
+	do {
+	  upVolID = mc->CurrentVolOffID(up,upcopy);
+	  upVolName = mc->CurrentVolOffName(up);
+          up++;
+	  auto iter2 = volnametomodulemap->find(upVolName);
+          if (iter2 != volnametomodulemap->end()) {
+	    lookupstructures.insertModuleName(volId, iter2->second);
+	    // std::cout << "FIXING TO " << iter2->second;
+	    break;
+	  }
+	}
+	while (up < limit);
+	//
+      }
     }
   }
 
@@ -82,6 +105,14 @@ StepInfo::StepInfo(TVirtualMC* mc)
   // cputimestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(now - starttime).count();
   nsecondaries = mc->NSecondaries();
 
+  if (nsecondaries > 0) {
+    lookupstructures.setProducedSecondary(trackID, true);
+  }
+  
+  if (mc->IsTrackExiting()) {
+    lookupstructures.setCrossedBoundary(trackID, true);
+  }
+  
   if (nsecondaries > 0) {
     secondaryprocesses = new int[nsecondaries];
     // for the processes

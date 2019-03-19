@@ -59,7 +59,10 @@ struct StepLookups {
   std::vector<std::string*> volidtomedium;
   std::vector<int> tracktopdg;
   std::vector<int> tracktoparent; // when parent is -1 we mean primary
-
+  std::vector<int> stepcounterpertrack;
+  std::vector<bool> crossedboundary; // if track every crossed a geometry boundary
+  std::vector<bool> producedsecondary; // if track ever produced a secondary
+  
   void insertVolName(int index, std::string const& s) { insertValueAt(index, s, volidtovolname); }
   void insertModuleName(int index, std::string const& s) { insertValueAt(index, s, volidtomodule); }
   std::string* getModuleAt(int index) const
@@ -82,6 +85,27 @@ struct StepLookups {
     tracktopdg[trackindex] = pdg;
   }
 
+  void incStepCount(int trackindex) {
+    if (trackindex >= stepcounterpertrack.size()) {
+      stepcounterpertrack.resize(trackindex + 1, 0);
+    }
+    stepcounterpertrack[trackindex]++;
+  }
+
+  void setProducedSecondary(int trackindex, bool b) {
+    if (trackindex >= producedsecondary.size()) {
+      producedsecondary.resize(trackindex + 1, false);
+    }
+    producedsecondary[trackindex]=b;
+  }
+
+  void setCrossedBoundary(int trackindex, bool b) {
+    if (trackindex >= crossedboundary.size()) {
+      crossedboundary.resize(trackindex + 1, false);
+    }
+    crossedboundary[trackindex]=b;
+  }
+  
   void insertParent(int trackindex, int parent)
   {
     constexpr int PRIMARY = -1;

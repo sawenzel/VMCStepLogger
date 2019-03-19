@@ -76,7 +76,7 @@ void initVolumeMap()
       // split the line into key + value
       int counter = 0;
       std::string keyvalue[2] = { "NULL", "NULL" };
-      while (counter < 2 && std::getline(ss, token, ' ')) {
+      while (counter < 2 && std::getline(ss, token, ':')) {
         if (!token.empty()) {
           keyvalue[counter] = token;
           counter++;
