@@ -60,6 +60,7 @@ struct StepLookups {
   std::vector<int> tracktopdg;
   std::vector<int> tracktoparent; // when parent is -1 we mean primary
   std::vector<int> stepcounterpertrack;
+  std::vector<float> tracktoenergy; // mapping of trackID to the track energy
   std::vector<bool> crossedboundary; // if track every crossed a geometry boundary
   std::vector<bool> producedsecondary; // if track ever produced a secondary
   
@@ -105,8 +106,17 @@ struct StepLookups {
     }
     crossedboundary[trackindex]=b;
   }
-  
 
+  void setTrackEnergy(int trackindex, float e) {
+    if (trackindex >= tracktoenergy.size()) {
+      tracktoenergy.resize(trackindex + 1, -1.);
+    }
+    // only take the starting energy
+    if (tracktoenergy[trackindex]==-1.) {
+      tracktoenergy[trackindex]=e;
+    }
+  }
+  
   bool initSensitiveVolLookup(std::string const& filename);
 
   void insertParent(int trackindex, int parent)
@@ -122,6 +132,15 @@ struct StepLookups {
     tracktoparent[trackindex] = parent;
   }
 
+  void clearTrackLookups() {
+    tracktoparent.clear();
+    producedsecondary.clear();
+    crossedboundary.clear();
+    tracktopdg.clear();
+    stepcounterpertrack.clear();
+    tracktoenergy.clear();
+  }
+  
  private:
   void insertValueAt(int index, std::string const& s, std::vector<std::string*>& container)
   {
@@ -162,11 +181,13 @@ struct StepInfo {
   float step = 0.;
   float maxstep = 0.;
   int nsecondaries = 0;
-  int* secondaryprocesses = nullptr; //[nsecondaries]
+  int prodprocess = -1;   // prod process of current track
   int nprocessesactive = 0;          // number of active processes
   bool stopped = false;              //
   bool insensitiveRegion = false;    // whether step done in sensitive region
 
+  const char* getProdProcessAsString() const;
+  
   static int stepcounter;           //!
   static StepInfo* currentinstance; //!
   static std::chrono::time_point<std::chrono::high_resolution_clock> starttime;

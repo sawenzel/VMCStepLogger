@@ -15,6 +15,9 @@
 #include "MCStepLogger/MCAnalysisUtilities.h"
 #include "TInterpreter.h"
 #include "TInterpreterValue.h"
+#include "TFile.h"
+#include "TTree.h"
+#include "TDatabasePDG.h"
 
 ClassImp(o2::mcstepanalysis::SimpleStepAnalysis);
 
@@ -36,13 +39,17 @@ void SimpleStepAnalysis::initialize()
   histNStepsPerVolSorted = getHistogram<TH1I>("nStepsPerVolSorted", 1, 2., 1.);
 
   // accumulated number of secondaries produced per volume
-  histNSecondariesPerVol = getHistogram<TH1I>("nSecondariesPerVol", 1, 0., 1.);
+  histNSecondariesPerVol = getHistogram<TH1I>("nSecondariesPerVol", 1, 2., 1.);
   // accumulated number of secondaries produces per module
-  histNSecondariesPerMod = getHistogram<TH1I>("nSecondariesPerMod", 1, 0., 1.);
+  histNSecondariesPerMod = getHistogram<TH1I>("nSecondariesPerMod", 1, 2., 1.);
   histNSecondariesPerMod->Sumw2(false);
   // accumulated number of secondaries produces per pdg
-  histNSecondariesPerPDG = getHistogram<TH1I>("nSecondariesPerPDG", 1, 0., 1.);
+  histNSecondariesPerPDG = getHistogram<TH1I>("nSecondariesPerPDG", 1, 2., 1.);
 
+  histTrackEnergySpectrum = getHistogram<TH1I>("trackEnergySpectrum", 400, -10, 4.);
+  histTrackPDGSpectrum = getHistogram<TH1I>("trackPDGSpectrum", 1, 2., 1.);
+  histTrackPDGSpectrumSorted = getHistogram<TH1I>("trackPDGSpectrumSorted", 1, 2., 1.);
+  
   // steps in the r-z plane
   histRZ = getHistogram<TH2D>("RZOccupancy", 200, -3000., 3000., 200, 0., 3000.);
   // steps in x-y plane
@@ -52,10 +59,10 @@ void SimpleStepAnalysis::initialize()
   // thanks to discussions with Philippe Canal, Fermilab
   auto cutcondition = getenv("MCSTEPCUT");
   if (cutcondition) {
-    std::string expr = "#include \"StepInfo.h\"\n bool user_cut(const o2::StepInfo &step, \
+    std::string expr = "#include \"StepInfo.h\"\n #include <cmath>\n bool user_cut(const o2::StepInfo &step, \
                         const std::string &volname,                                       \
                         const std::string &modname,                                       \
-                        int pdg) {";
+                        int pdg, o2::StepLookups* lookup) {";
     expr+=std::string(cutcondition);
     expr+=std::string("}");
     auto installpath = getenv("MCSTEPLOGGER_ROOT");
@@ -73,10 +80,25 @@ void SimpleStepAnalysis::initialize()
     gInterpreter->Evaluate("user_cut", *v);
     mUserCutFunction = (cut_function_type*)v->GetValAddr();
   }
+
+  if(getenv("KEEPSTEPS")) {
+    steptree = new TTree("Steps", "Steps");
+  }
+
 }
 
 void SimpleStepAnalysis::analyze(const std::vector<StepInfo>* const steps, const std::vector<MagCallInfo>* const magCalls)
 {
+  static auto pdgdatabase = new TDatabasePDG;
+  static StepInfo const* stepptr;
+  static TBranch* branch;
+  static bool keepsteps = getenv("KEEPSTEPS") != nullptr;
+  if (keepsteps && !branch) {
+    branch = steptree->Branch("Steps", &stepptr);
+    stepfile = new TFile("Steps.root", "RECREATE");
+    steptree->SetDirectory(stepfile);
+  }
+
   // to store the volume name
   std::string volName;
   // to store the module name
@@ -88,8 +110,14 @@ void SimpleStepAnalysis::analyze(const std::vector<StepInfo>* const steps, const
   int pdgId = 0;
   int nCutSteps = 0;
 
+  int oldTrackID = -1; // to notice when a track changes
+  
   // loop over all steps in an event
   for (const auto& step : *steps) {
+    int currentTrackID = step.trackID;
+    bool newtrack = (currentTrackID != oldTrackID);
+    if (newtrack) oldTrackID = currentTrackID;
+    
     // prepare for PDG ids and volume names
     mAnalysisManager->getLookupPDG(step.trackID, pdgId);
     mAnalysisManager->getLookupVolName(step.volId, volName);
@@ -99,13 +127,24 @@ void SimpleStepAnalysis::analyze(const std::vector<StepInfo>* const steps, const
     nSteps++;
 
     // apply user defined cut -- if any
-    if (mUserCutFunction && !(*mUserCutFunction)(step, volName, modName, pdgId)) {
+    if (mUserCutFunction && !(*mUserCutFunction)(step, volName, modName, pdgId, mAnalysisManager->getLookups())) {
       nCutSteps++;
       continue;
     }
 
-    std::string pdgasstring(std::to_string(pdgId));
+    if (keepsteps) {
+      stepptr = &step;
+      steptree->Fill();
+    }
 
+    auto pdgparticle = pdgdatabase->GetParticle(pdgId);    
+    std::string pdgasstring(pdgparticle? pdgparticle->GetName() : std::to_string(pdgId));
+
+    if (newtrack) {
+      histTrackEnergySpectrum->Fill(log10f(step.E));
+      histTrackPDGSpectrum->Fill(pdgasstring.c_str(),1);
+    }
+    
     // record number of steps per module
     histNStepsPerMod->Fill(modName.c_str(), 1);
     // record number of steps per volume
@@ -130,6 +169,11 @@ void SimpleStepAnalysis::finalize()
 
   std::cerr << "MOD have " << histNStepsPerMod->GetEntries() << " entries \n";
 
+  *histTrackPDGSpectrumSorted = *histTrackPDGSpectrum;
+  histTrackPDGSpectrumSorted->SetName("trackPDGSpectrumSorted");
+  histTrackPDGSpectrumSorted->LabelsOption(">", "X");
+  histTrackPDGSpectrumSorted->SetBins(10,0,10);
+  
   // sortit
   // histNStepsPerVolSorted->LabelsOption(">", "X");
 
@@ -140,4 +184,12 @@ void SimpleStepAnalysis::finalize()
   histNSecondariesPerMod->LabelsOption(">", "X");
   histNSecondariesPerVol->LabelsOption(">", "X");
   histNSecondariesPerVol->SetBins(30,0,30);
+
+
+  if(getenv("KEEPSTEPS")) {
+    std::cout << "Writing step tree\n";
+    steptree->Write();
+    stepfile->Close();
+  }
+
 }

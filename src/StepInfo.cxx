@@ -23,6 +23,7 @@
 #include <TGeoManager.h>
 #include <TGeoMedium.h>
 #include <TGeoVolume.h>
+#include <TMCProcess.h>
 #include <cassert>
 #include <iostream>
 #include <fstream>
@@ -53,10 +54,9 @@ StepInfo::StepInfo(TVirtualMC* mc)
   auto id = mc->CurrentVolID(copyNo);
   volId = id;
 
-  auto curtrack = stack->GetCurrentTrack();
-  auto parentID = curtrack->IsPrimary() ? -1 : stack->GetCurrentParentTrackNumber();
+  auto parentID = trackID < stack->GetNprimary() ? -1 : stack->GetCurrentParentTrackNumber();
   lookupstructures.insertParent(trackID, parentID);
-
+  
   // try to resolve the module via external map
   // keep information in faster vector once looked up
   auto volname = mc->CurrentVolName();
@@ -106,7 +106,7 @@ StepInfo::StepInfo(TVirtualMC* mc)
   z = zd;
   step = mc->TrackStep();
   maxstep = mc->MaxStep();
-  E = curtrack->Energy();
+  E = mc->Etot();
   auto now = std::chrono::high_resolution_clock::now();
   // cputimestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(now - starttime).count();
   nsecondaries = mc->NSecondaries();
@@ -119,13 +119,7 @@ StepInfo::StepInfo(TVirtualMC* mc)
     lookupstructures.setCrossedBoundary(trackID, true);
   }
   
-  if (nsecondaries > 0) {
-    secondaryprocesses = new int[nsecondaries];
-    // for the processes
-    for (int i = 0; i < nsecondaries; ++i) {
-      secondaryprocesses[i] = mc->ProdProcess(i);
-    }
-  }
+  prodprocess = stack->GetCurrentTrack()->GetUniqueID();
 
   TArrayI procs;
   mc->StepProcesses(procs);
@@ -135,6 +129,10 @@ StepInfo::StepInfo(TVirtualMC* mc)
   stopped = mc->IsTrackStop();
 }
 
+const char* StepInfo::getProdProcessAsString() const {
+  return TMCProcessName[prodprocess];
+}
+  
 std::chrono::time_point<std::chrono::high_resolution_clock> StepInfo::starttime;
 int StepInfo::stepcounter = -1;
 std::map<std::string, std::string>* StepInfo::volnametomodulemap = nullptr;

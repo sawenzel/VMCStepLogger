@@ -161,7 +161,7 @@ void BasicMCAnalysis::analyze(const std::vector<StepInfo>* const steps, const st
     mAnalysisManager->getLookupModName(step.volId, modName);
 
     // apply user defined cut -- if any
-    if (mUserCutFunction && !(*mUserCutFunction)(step, volName, modName, pdgId)) {
+    if (mUserCutFunction && !(*mUserCutFunction)(step, volName, modName, pdgId, mAnalysisManager->getLookups())) {
       continue;
     }
     

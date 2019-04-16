@@ -28,17 +28,14 @@
 #define SIMPLESTEP_MCANALYSIS_H_
 
 #include "MCStepLogger/MCAnalysis.h"
+class TTree;
+class TFile;
 
 namespace o2
 {
 namespace mcstepanalysis
 {
 
-// type defining the cut-function signature
-// probably needs to be generalized
-// here we will give Step + meta info such as volumename, modulename, pdg
-typedef bool (*cut_function_type)(StepInfo const&, std::string const&, std::string const&, int);
-  
 class SimpleStepAnalysis : public MCAnalysis
 {
  public:
@@ -68,11 +65,20 @@ class SimpleStepAnalysis : public MCAnalysis
   // accumulated number of secondaries produces per pdg
   TH1I* histNSecondariesPerPDG;
 
+  // energy spectrum of tracks overall as log10f(E)
+  TH1I* histTrackEnergySpectrum;
+  TH1I* histTrackPDGSpectrum;
+  TH1I* histTrackPDGSpectrumSorted;
+  
   // steps in the r-z plane
   TH2D* histRZ;
   // steps in the x-y plane
   TH2D* histXY;
 
+  // keep steps (under cutting for instance)
+  TTree *steptree;
+  TFile *stepfile;
+  
   // pointing to a user cut function 
   cut_function_type* mUserCutFunction = nullptr; //!
 

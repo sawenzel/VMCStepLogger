@@ -321,8 +321,9 @@ class StepLogger
       flushToTTree("Steps", &container);
       flushToTTree("Lookups", &StepInfo::lookupstructures);
       // we need to reset some parts of the lookupstructures for the next event
-      StepInfo::lookupstructures.tracktoparent.clear();
-      StepInfo::lookupstructures.tracktopdg.clear();
+      // StepInfo::lookupstructures.tracktoparent.clear();
+      // StepInfo::lookupstructures.tracktopdg.clear();
+      StepInfo::lookupstructures.clearTrackLookups();
     }
     clear();
   }
